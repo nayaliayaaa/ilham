@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Taman Mekar</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&display=swap" rel="stylesheet">
+<style>
+:root{--bg1:#fff3ee;--bg2:#f8dce6;--bg3:#e6cdf0;--ink:#573253;--hint:#8a6683;--glow:rgba(255,255,255,.7);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#2a1840;--bg2:#1a1236;--bg3:#0e0b24;--ink:#fbeaf3;--hint:#c3a6c4;--glow:rgba(0,0,0,.55)}}
+:root[data-theme="dark"]{--bg1:#2a1840;--bg2:#1a1236;--bg3:#0e0b24;--ink:#fbeaf3;--hint:#c3a6c4;--glow:rgba(0,0,0,.55)}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:linear-gradient(180deg,var(--bg3) 0%,var(--bg2) 55%,var(--bg1) 100%);font-family:'Cormorant Garamond',Georgia,serif;color:var(--ink)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:manipulation;cursor:pointer}
+.q{position:fixed;left:50%;top:9vh;transform:translateX(-50%);width:min(780px,88vw);text-align:center;pointer-events:none;padding-top:env(safe-area-inset-top,0px)}
+.q p{margin:0;font-size:clamp(1.3rem,3.7vw,2.3rem);line-height:1.45;text-shadow:0 0 18px var(--glow),0 0 6px var(--glow)}
+.q span{display:inline-block;opacity:0;transform:translateY(14px);filter:blur(6px);animation:in 1.1s ease forwards;margin:0 .13em}
+@keyframes in{to{opacity:1;transform:none;filter:none}}
+.q small{display:block;margin-top:1.4em;font-size:1rem;color:var(--hint);opacity:0;animation:in 1.5s ease 9s forwards;font-style:italic}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<main class="q"><p id="quote"></p><small>sentuh layar untuk menanam bunga baru</small></main>
+<script>
+const quote="Tak perlu terburu-buru menjadi indah, sebab bahkan semesta pun tak pernah meminta bunga mekar sebelum waktunya; jadilah dirimu, sebab kamu tak perlu menjadi siapa-siapa untuk menjadi cukup.";
+const qEl=document.getElementById('quote');
+quote.split(' ').forEach((w,i)=>{const s=document.createElement('span');s.textContent=w;s.style.animationDelay=(0.8+i*0.2)+'s';qEl.appendChild(s)});
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,flowers=[],drops=[],bursts=[];
+function size(){const d=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0)}
+addEventListener('resize',size);size();
+
+const R=(a,b)=>a+Math.random()*(b-a);
+const clamp=v=>Math.max(0,Math.min(1,v));
+const eOut=t=>1-Math.pow(1-t,3);
+const eBack=t=>{const c=1.7;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2)};
+const pal=[[335,80,70],[350,85,72],[12,90,70],[38,95,64],[52,95,62],[285,60,72],[265,65,75],[205,75,72],[320,70,78],[0,0,97]];
+
+function make(x,y,delay){
+  return{x,y,by:H+20,r:R(15,34),n:Math.floor(R(5,10)),c:pal[Math.floor(R(0,pal.length))],
+    delay,t0:performance.now(),ph:R(0,6.28),rot:R(0,6.28),leaf:Math.random()<.5?1:-1,w:R(.8,1.3)};
+}
+function plant(x,y,delay){flowers.push(make(x,y,delay));flowers.sort((a,b)=>a.y-b.y)}
+
+const N=Math.max(18,Math.min(40,Math.round(W/38)));
+for(let i=0;i<N;i++)plant((i+R(.1,.9))/N*W,H*R(.52,.9),R(0,4500));
+
+for(let i=0;i<26;i++)drops.push({x:R(0,W),y:R(-H,H),s:R(3,7),v:R(.25,.7),dx:R(-.3,.3),ph:R(0,6),c:pal[Math.floor(R(0,6))]});
+
+addEventListener('pointerdown',e=>{
+  plant(e.clientX,e.clientY,0);
+  for(let i=0;i<10;i++){const a=R(0,6.28),v=R(1,3.2);bursts.push({x:e.clientX,y:e.clientY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1,l:1,c:pal[Math.floor(R(0,pal.length))]})}
+});
+
+function bez(p0,p1,p2,u){const k=1-u;return k*k*p0+2*k*u*p1+u*u*p2}
+function petal(len,wid){ctx.beginPath();ctx.ellipse(0,-len*.62,wid,len*.62,0,0,6.283);ctx.fill()}
+
+function drawFlower(f,t){
+  const el=t-f.t0-f.delay; if(el<0)return;
+  const sp=eOut(clamp(el/1800)), bp=clamp((el-1300)/1800);
+  const sway=Math.sin(t/1300+f.ph)*7*sp;
+  const hx=f.x+sway, hy=f.by+(f.y-f.by)*sp;
+  const cx=f.x-sway*1.5, cy=(f.by+hy)/2;
+  ctx.lineCap='round';
+  ctx.strokeStyle='hsl(135,40%,38%)';ctx.lineWidth=2.2*f.w;
+  ctx.beginPath();ctx.moveTo(f.x,f.by);ctx.quadraticCurveTo(cx,cy,hx,hy);ctx.stroke();
+  [[.5,f.leaf],[.72,-f.leaf]].forEach(([u,d])=>{
+    const px=bez(f.x,cx,hx,u),py=bez(f.by,cy,hy,u),s=sp*clamp((sp-u*.6)*2);
+    ctx.save();ctx.translate(px,py);ctx.rotate(d*(.9+Math.sin(t/1500+f.ph)*.08));
+    ctx.fillStyle='hsl(140,45%,44%)';ctx.scale(s,s);
+    ctx.beginPath();ctx.ellipse(d*10,0,12,4.5,0,0,6.283);ctx.fill();ctx.restore();
+  });
+  if(bp<=0){ctx.fillStyle='hsl(135,45%,45%)';ctx.beginPath();ctx.arc(hx,hy,3.2*sp,0,6.283);ctx.fill();return}
+  const sc=eBack(bp),[h,s,l]=f.c,spin=f.rot+bp*.8+Math.sin(t/2500+f.ph)*.05;
+  ctx.save();ctx.translate(hx,hy);
+  for(let layer=0;layer<2;layer++){
+    const n=f.n,len=f.r*(layer?.62:1)*sc,wid=len*(layer?.3:.34);
+    ctx.fillStyle=`hsl(${h},${s}%,${layer?Math.min(l+12,96):l}%)`;
+    for(let i=0;i<n;i++){ctx.save();ctx.rotate(spin+i*6.283/n+(layer?3.14/n:0));petal(len,wid);ctx.restore()}
+  }
+  ctx.fillStyle='hsl(45,95%,60%)';ctx.beginPath();ctx.arc(0,0,f.r*.2*sc,0,6.283);ctx.fill();
+  ctx.fillStyle='hsl(30,90%,50%)';ctx.beginPath();ctx.arc(0,0,f.r*.09*sc,0,6.283);ctx.fill();
+  ctx.restore();
+}
+
+function loop(t){
+  ctx.clearRect(0,0,W,H);
+  drops.forEach(d=>{
+    d.y+=d.v;d.x+=d.dx+Math.sin(t/900+d.ph)*.4;
+    if(d.y>H+10){d.y=-10;d.x=R(0,W)}
+    ctx.save();ctx.translate(d.x,d.y);ctx.rotate(t/700+d.ph);ctx.globalAlpha=.55;
+    ctx.fillStyle=`hsl(${d.c[0]},${d.c[1]}%,${d.c[2]}%)`;
+    ctx.beginPath();ctx.ellipse(0,0,d.s,d.s*.5,0,0,6.283);ctx.fill();ctx.restore();
+  });
+  flowers.forEach(f=>drawFlower(f,t));
+  bursts=bursts.filter(b=>b.l>0);
+  bursts.forEach(b=>{
+    b.x+=b.vx;b.y+=b.vy;b.vy+=.05;b.l-=.012;
+    ctx.globalAlpha=Math.max(b.l,0);ctx.fillStyle=`hsl(${b.c[0]},${b.c[1]}%,${b.c[2]}%)`;
+    ctx.beginPath();ctx.ellipse(b.x,b.y,5,2.6,b.l*8,0,6.283);ctx.fill();ctx.globalAlpha=1;
+  });
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
